@@ -1,0 +1,23 @@
+{
+  "name": "mirefall",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Mirefall — a cinematic dark-fantasy third-person action game in Three.js. A small amphibian warrior fights a moth deity in a flooded swamp kingdom.",
+  "scripts": {
+    "dev": "vite --port 5135 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5135 --strictPort",
+    "progress": "node tools/progress-server.js",
+    "shots": "node tools/capture.js",
+    "perf": "node tools/perf.js",
+    "smoke": "node tools/smoke.js"
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0",
+    "vite": "^6.0.0"
+  }
+}
