@@ -60,6 +60,23 @@ export async function launch({ width = 1920, height = 1080, quality = null, head
       await page.waitForTimeout(seconds * 1000);
       await api.frames(4);
     },
+    /**
+     * Wait until a page-side expression is truthy. Prefer this over settle() for anything
+     * gated on SIMULATION time: dt is clamped to 1/20 s per frame, so on a loaded machine
+     * simulated time advances more slowly than wall-clock and fixed sleeps become flaky.
+     */
+    waitFor: async (expr, { timeout = 30000, label = expr } = {}) => {
+      const t0 = Date.now();
+      while (Date.now() - t0 < timeout) {
+        const ok = await page.evaluate((src) => {
+          try { return !!new Function('M', `return (${src});`)(window.__MIREFALL__); }
+          catch { return false; }
+        }, expr);
+        if (ok) return true;
+        await page.waitForTimeout(120);
+      }
+      throw new Error(`waitFor timed out after ${timeout}ms: ${label}`);
+    },
     logs: () => logs,
   };
 

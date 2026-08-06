@@ -43,8 +43,10 @@ function check(name, cond, detail = '') {
 
     // --- combat: the boss is invulnerable during its entrance, so wait it out ---
     await api.call('teleport', 0, -6);
-    await api.settle(5.0);
-    check('boss finishes its entrance', (await api.call('boss')).state !== 'intro');
+    let introDone = true;
+    try { await api.waitFor('M.game.boss.state !== "intro"', { label: 'boss entrance complete' }); }
+    catch (e) { introDone = false; }
+    check('boss finishes its entrance', introDone, (await api.call('boss')).state);
     const b0 = await api.call('boss');
     const dmg = await api.call('damageBoss', 120);
     check('boss takes damage', dmg < b0.health, `${b0.health.toFixed(0)} -> ${dmg.toFixed(0)}`);
@@ -97,7 +99,9 @@ function check(name, cond, detail = '') {
 
     // --- stagger window ---
     await api.call('stagger');
-    await api.settle(2.6);
+    // Wait on the mechanic itself, not a proxy: debug headY reports bodyPivot height while the
+    // hitbox is gated on the head's WORLD y, and the two differ by the rig offset.
+    try { await api.waitFor('M.game.boss.hitParts().some(p => p.name === "head")', { timeout: 25000 }); } catch {}
     const stg = await api.call('boss');
     check('stagger lowers the head into reach', stg.headY < 14, `headY=${stg.headY.toFixed(1)}`);
     check('stagger exposes a head hitbox', await api.eval('return M.game.boss.hitParts().some(p => p.name === "head");'));
@@ -113,7 +117,7 @@ function check(name, cond, detail = '') {
     await api.settle(0.3);
     const dyingState = await api.call('state');
     check('player death enters the dying sequence', dyingState === 'dying' || dyingState === 'death', `state=${dyingState}`);
-    await api.settle(3.4);
+    try { await api.waitFor('M.state() === "death"', { timeout: 20000 }); } catch {}
     const deadState = await api.call('state');
     check('player death reaches death state', deadState === 'death', `state=${deadState}`);
 
@@ -125,7 +129,7 @@ function check(name, cond, detail = '') {
 
     // --- boss death -> victory ---
     await api.call('killBoss');
-    await api.settle(12.5);
+    try { await api.waitFor('M.state() === "victory"', { timeout: 60000 }); } catch {}
     const st = await api.call('state');
     check('boss death reaches victory', st === 'victory', `state=${st}`);
 
