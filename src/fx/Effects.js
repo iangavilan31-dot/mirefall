@@ -60,9 +60,12 @@ export class Effects {
     scene.add(this.points);
 
     this.parts = new Array(MAX);
-    for (let i = 0; i < MAX; i++) this.parts[i] = { alive: false };
+    this._free = new Array(MAX);
+    for (let i = 0; i < MAX; i++) {
+      this.parts[i] = { alive: false };
+      this._free[i] = MAX - 1 - i;      // pop() hands out low indices first
+    }
     this.count = 0;
-    this._cursor = 0;
 
     // ---- shockwave rings ----
     this.rings = [];
@@ -111,13 +114,11 @@ export class Effects {
   _spawn(x, y, z, vx, vy, vz, life, size, color, opts = {}) {
     const budget = settings.q.particles;
     if (Math.random() > budget && !opts.important) return null;
-    let idx = -1;
-    for (let i = 0; i < MAX; i++) {
-      const j = (this._cursor + i) % MAX;
-      if (!this.parts[j].alive) { idx = j; break; }
-    }
-    if (idx < 0) return null;
-    this._cursor = (idx + 1) % MAX;
+    // O(1) allocation from a free list. A linear scan for a dead slot costs up to MAX per
+    // particle, and a big splash allocates ~80 at once — that is a visible hitch on impact,
+    // exactly when the frame can least afford one.
+    if (this._free.length === 0) return null;
+    const idx = this._free.pop();
     const p = this.parts[idx];
     p.alive = true;
     p.x = x; p.y = y; p.z = z;
@@ -264,7 +265,7 @@ export class Effects {
       const i3 = i * 3;
       if (!p.alive) { this.alp[i] = 0; continue; }
       p.life -= dt;
-      if (p.life <= 0) { p.alive = false; this.alp[i] = 0; continue; }
+      if (p.life <= 0) { p.alive = false; this._free.push(i); this.alp[i] = 0; continue; }
 
       p.vy += p.gravity * dt;
       const d = Math.max(0, 1 - p.drag * dt);
@@ -275,7 +276,7 @@ export class Effects {
       if (p.y < SCALE.waterLevel && p.vy < 0) {
         if (p.splashOnLand) {
           this.water?.splash(p.x, p.z, 0.06, 0.28);
-          p.alive = false; this.alp[i] = 0; continue;
+          p.alive = false; this._free.push(i); this.alp[i] = 0; continue;
         }
         p.y = SCALE.waterLevel; p.vy *= -0.25;
       }
