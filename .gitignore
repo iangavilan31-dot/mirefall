@@ -6,3 +6,7 @@ captures/*.json
 !captures/.gitkeep
 .DS_Store
 *.log
+
+# agent worktrees + wave drop folders (never tracked)
+.claude/
+.wave*/

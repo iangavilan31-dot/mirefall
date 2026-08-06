@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>MIREFALL — build progress</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--bg:#0d1113;--panel:#141a1d;--line:#222b2f;--fg:#dbe3e5;--dim:#7e8c92;--ok:#9fc08a;--warn:#d8b45a;--bad:#c4705f;--acc:#8fb0c0}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--fg);font:13px/1.6 ui-sans-serif,system-ui,"Segoe UI",sans-serif;padding:26px}
+h1{font-size:13px;letter-spacing:.5em;text-transform:uppercase;color:var(--dim);font-weight:400;margin-bottom:4px}
+.meta{color:var(--dim);font-size:11px;margin-bottom:22px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);padding:15px 17px;border-radius:3px}
+.card h2{font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--dim);font-weight:500;margin-bottom:11px}
+.row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.035)}
+.row:last-child{border:0}
+.k{color:var(--dim)}
+.v{text-align:right}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.p-run{background:rgba(143,176,192,.16);color:var(--acc)}
+.p-done{background:rgba(159,192,138,.15);color:var(--ok)}
+.p-block{background:rgba(196,112,95,.15);color:var(--bad)}
+.p-queue{background:rgba(126,140,146,.13);color:var(--dim)}
+.shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.shot{border:1px solid var(--line);border-radius:3px;overflow:hidden;background:#000}
+.shot img{width:100%;display:block;aspect-ratio:16/9;object-fit:cover}
+.shot .cap{padding:6px 8px;font-size:10px;color:var(--dim);letter-spacing:.06em}
+.wide{grid-column:1/-1}
+ol,ul{padding-left:18px}
+li{margin:4px 0}
+code{background:#0a0e10;padding:1px 6px;border-radius:2px;color:var(--acc);font-size:11px}
+.bar{height:4px;background:#0a0e10;border-radius:2px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--acc)}
+.ba{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ba figure{margin:0}.ba img{width:100%;border:1px solid var(--line)}
+.ba figcaption{font-size:10px;color:var(--dim);padding:4px 0}
+.empty{color:var(--dim);font-style:italic}
+</style></head>
+<body>
+<h1>Mirefall</h1>
+<div class="meta" id="meta">loading…</div>
+<div class="grid" id="root"></div>
+<script>
+const esc = s => String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const pill = s => `<span class="pill p-${s==='done'?'done':s==='blocked'?'block':s==='running'?'run':'queue'}">${esc(s)}</span>`;
+function card(title, html, wide){ return `<div class="card${wide?' wide':''}"><h2>${esc(title)}</h2>${html}</div>`; }
+function rows(obj){ return Object.entries(obj).map(([k,v])=>`<div class="row"><span class="k">${esc(k)}</span><span class="v">${v}</span></div>`).join(''); }
+
+async function load(){
+  let s;
+  try { s = await (await fetch('state.json?'+Date.now())).json(); }
+  catch(e){ document.getElementById('meta').textContent = 'state.json not found'; return; }
+
+  document.getElementById('meta').innerHTML =
+    `wave <b>${esc(s.wave)}</b> · updated ${esc(s.updated)} · ${esc(s.headline||'')}`;
+
+  const out = [];
+
+  out.push(card('Playable state', rows({
+    'Build': s.build?.ok ? pill('done')+' passing' : pill('blocked')+' failing',
+    'Smoke gate': s.smoke ? `${s.smoke.passed}/${s.smoke.total} checks` : '<span class="empty">not run</span>',
+    'Loop': esc(s.playable||'—'),
+    'Run it': '<code>npm run dev</code> → <code>localhost:5135</code>',
+  })));
+
+  const perf = s.perf || {};
+  out.push(card('Performance', rows(Object.assign({}, perf.summary||{},{
+    'Draw calls': perf.calls ?? '—', 'Triangles': perf.tris ?? '—',
+  }))) + (perf.note?`<div class="cap" style="color:var(--dim);font-size:10px;margin-top:8px">${esc(perf.note)}</div>`:''));
+
+  const ws = (s.workstreams||[]).map(w=>`<div class="row">
+      <span class="k">${esc(w.name)}</span>
+      <span class="v">${pill(w.status)} ${w.pass?`<span style="color:var(--dim);font-size:10px">pass ${esc(w.pass)}</span>`:''}</span>
+    </div>${w.note?`<div style="color:var(--dim);font-size:11px;padding:0 0 6px">${esc(w.note)}</div>`:''}`).join('');
+  out.push(card('Workstreams', ws || '<div class="empty">none</div>', true));
+
+  if (s.weaknesses?.length)
+    out.push(card('Largest unresolved weaknesses', '<ol>'+s.weaknesses.map(w=>`<li>${esc(w)}</li>`).join('')+'</ol>', true));
+
+  if (s.blockers?.length)
+    out.push(card('Blockers', '<ul>'+s.blockers.map(w=>`<li>${esc(w)}</li>`).join('')+'</ul>', true));
+
+  if (s.shots?.length)
+    out.push(card('Latest captures', '<div class="shots">'+s.shots.map(sh=>
+      `<div class="shot"><img src="${esc(sh.file)}?${Date.now()}" alt="${esc(sh.id)}"><div class="cap">${esc(sh.id)} — ${esc(sh.desc||'')}</div></div>`).join('')+'</div>', true));
+
+  if (s.beforeAfter?.length)
+    out.push(card('Before / after', s.beforeAfter.map(b=>
+      `<div style="margin-bottom:14px"><div style="font-size:11px;color:var(--dim);margin-bottom:5px">${esc(b.label)}</div>
+       <div class="ba"><figure><img src="${esc(b.before)}?${Date.now()}"><figcaption>before</figcaption></figure>
+       <figure><img src="${esc(b.after)}?${Date.now()}"><figcaption>after</figcaption></figure></div></div>`).join(''), true));
+
+  if (s.passes?.length)
+    out.push(card('Completed passes', '<ul>'+s.passes.map(p=>`<li>${esc(p)}</li>`).join('')+'</ul>', true));
+
+  document.getElementById('root').innerHTML = out.join('');
+}
+load(); setInterval(load, 5000);
+</script></body></html>

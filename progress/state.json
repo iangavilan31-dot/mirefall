@@ -1,0 +1,48 @@
+{
+  "wave": "1 — parallel build",
+  "updated": "2026-08-06",
+  "headline": "Playable loop verified 37/37. Render pipeline repaired. Boss presence, lighting values and composition are the open failures.",
+  "playable": "title -> combat -> 3 boss phases -> stagger -> death -> restart -> victory -> ending",
+  "build": { "ok": true },
+  "smoke": { "passed": 37, "total": 37 },
+  "perf": {
+    "calls": 1079,
+    "tris": 238000,
+    "summary": { "headless avg": "55 fps @1080p high" },
+    "note": "Headless Chromium uses a software rasteriser — these are a FLOOR, not desktop-GPU numbers. 1079 draw calls is hardware-independent and too high; instancing is queued for wave 2."
+  },
+  "workstreams": [
+    { "name": "Boss presence & animation", "status": "running", "pass": 1, "note": "The deity is absent from the hero and gameplay framings — the single biggest failure." },
+    { "name": "Lighting & value structure", "status": "running", "pass": 1, "note": "Far field is near-white; target is mid-grey fog over dark water. Moon not visible." },
+    { "name": "Water", "status": "running", "pass": 1, "note": "Reflection works; too mirror-bright, ripples not reading." },
+    { "name": "Environment composition", "status": "running", "pass": 1, "note": "Posts read as random scatter; frame edges not reliably occupied." },
+    { "name": "Player design & animation", "status": "running", "pass": 1, "note": "Reads as a dark blob at gameplay distance." },
+    { "name": "Post-processing & fog", "status": "running", "pass": 1, "note": "DOF repaired; grade is washing values out." },
+    { "name": "Camera & composition", "status": "running", "pass": 1, "note": "Player centred rather than low-left; boss never framed." },
+    { "name": "Performance / draw calls", "status": "queued", "note": "Wave 2." },
+    { "name": "Audio", "status": "queued", "note": "Procedural bed implemented, unreviewed." },
+    { "name": "UI & accessibility", "status": "queued", "note": "Implemented, unreviewed." },
+    { "name": "Integration pass", "status": "queued", "note": "After wave 1 merge." }
+  ],
+  "weaknesses": [
+    "The boss does not appear in the hero or gameplay camera at all — the centrepiece is invisible.",
+    "Value structure is inverted: fog reads near-white, water reads bright, nothing is dark.",
+    "The moon is not visible in frame despite being the key light and the compositional crown.",
+    "Environment placement reads as procedural scatter, not authored composition.",
+    "Player silhouette is an unlit blob at gameplay distance.",
+    "1079 draw calls for a scene this size."
+  ],
+  "blockers": [],
+  "passes": [
+    "Baseline vertical slice — full playable loop, 37/37 smoke checks.",
+    "Render pipeline repair — colour space, layer masking, DOF depth feedback loop, ShaderPass texture binding, fog card density, telegraph decal blowout."
+  ],
+  "shots": [
+    { "id": "hero", "file": "../captures/pass1/hero.png", "desc": "reference framing — boss absent, values washed out" },
+    { "id": "boss_close", "file": "../captures/pass1/boss_close.png", "desc": "close boss framing" },
+    { "id": "wide_arena", "file": "../captures/pass1/wide_arena.png", "desc": "arena width and fog falloff" }
+  ],
+  "beforeAfter": [
+    { "label": "Render pipeline repair (hero shot)", "before": "../captures/pass0/hero.png", "after": "../captures/pass1/hero.png" }
+  ]
+}
