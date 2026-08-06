@@ -1,0 +1,35 @@
+{
+  "at": "2026-08-06T06:56:06.632Z",
+  "quality": "high",
+  "shots": [
+    {
+      "id": "hero",
+      "desc": "The reference frame recreated: player low-left, boss crowned by moon, wings full width.",
+      "file": "captures\\pass1\\hero.png",
+      "fps": 58.1,
+      "calls": 1081,
+      "tris": 238225
+    },
+    {
+      "id": "boss_close",
+      "desc": "Wing translucency, moss detail, eye bloom at close range.",
+      "file": "captures\\pass1\\boss_close.png",
+      "fps": 55.7,
+      "calls": 1079,
+      "tris": 237973
+    },
+    {
+      "id": "wide_arena",
+      "desc": "Fog hides the world limits; both frame edges framed by architecture.",
+      "file": "captures\\pass1\\wide_arena.png",
+      "fps": 58.7,
+      "calls": 1079,
+      "tris": 237973
+    }
+  ],
+  "consoleErrors": [],
+  "logTail": [
+    "[debug] [vite] connecting...",
+    "[debug] [vite] connected."
+  ]
+}

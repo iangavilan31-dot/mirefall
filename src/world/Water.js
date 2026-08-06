@@ -194,8 +194,13 @@ export class Water {
     this.reflectRT = null;
     this._makeReflectionTarget();
     this.reflectCam = new THREE.PerspectiveCamera();
-    this.reflectCam.layers.enableAll();
-    this.reflectCam.layers.disable(2); // LAYERS.NO_REFLECT
+    /**
+     * Objects hidden for the duration of the reflection pass. Visibility toggling is used
+     * rather than layers: `layers.set(n)` would also hide them from the MAIN camera, and
+     * an object on {0,n} still intersects a {0} camera mask, so layers cannot express
+     * "visible normally, absent from this one pass".
+     */
+    this.excludeFromReflection = [];
 
     const geo = new THREE.PlaneGeometry(extent, extent, 220, 220);
     geo.rotateX(-Math.PI / 2);
@@ -234,7 +239,7 @@ export class Water {
     this.mesh.position.y = level;
     this.mesh.renderOrder = 2;
     this.mesh.frustumCulled = false;
-    this.mesh.layers.set(2); // never reflect the water in itself
+    // the water never reflects itself; Game hides it around the reflection pass
     this.mesh.name = 'water';
 
     this._reflectMatrix = new THREE.Matrix4();
@@ -356,6 +361,13 @@ export class Water {
     const prevRT = renderer.getRenderTarget();
     const prevShadow = renderer.shadowMap.enabled;
     const prevBg = scene.background;
+
+    this.mesh.visible = false;
+    const restore = [];
+    for (const o of this.excludeFromReflection) {
+      if (o) { restore.push([o, o.visible]); o.visible = false; }
+    }
+
     renderer.shadowMap.enabled = false;
     renderer.setRenderTarget(this.reflectRT);
     renderer.setClearColor(PALETTE.fog, 1);
@@ -364,6 +376,9 @@ export class Water {
     renderer.setRenderTarget(prevRT);
     renderer.shadowMap.enabled = prevShadow;
     scene.background = prevBg;
+
+    for (const [o, v] of restore) o.visible = v;
+    this.mesh.visible = true;
 
     this.uniforms.uReflect.value = this.reflectRT.texture;
     this.uniforms.uHasReflection.value = 1;

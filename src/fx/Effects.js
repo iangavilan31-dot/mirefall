@@ -56,7 +56,7 @@ export class Effects {
     this.points = new THREE.Points(geo, this.material);
     this.points.frustumCulled = false;
     this.points.renderOrder = 20;
-    this.points.layers.set(2);
+    // excluded from the water reflection via Water.excludeFromReflection
     scene.add(this.points);
 
     this.parts = new Array(MAX);
@@ -73,7 +73,7 @@ export class Effects {
         color: PALETTE.moonLight.clone(), transparent: true, opacity: 0,
         depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false,
       }));
-      m.visible = false; m.renderOrder = 8; m.layers.set(2);
+      m.visible = false; m.renderOrder = 8;
       scene.add(m);
       this.rings.push({ mesh: m, active: false });
     }
@@ -94,7 +94,7 @@ export class Effects {
     }));
     this.trailMesh.frustumCulled = false;
     this.trailMesh.renderOrder = 21;
-    this.trailMesh.layers.set(2);
+    
     scene.add(this.trailMesh);
 
     this._moonfallBeam = null;

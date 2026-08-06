@@ -121,6 +121,18 @@ const GradeShader = {
   `,
 };
 
+/** Straight blit, used as the chain entry point when DOF is disabled. */
+const CopyIntoChainShader = {
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: GradeShader.vertexShader,
+  fragmentShader: /* glsl */`
+    precision highp float;
+    uniform sampler2D tDiffuse;
+    varying vec2 vUv;
+    void main(){ gl_FragColor = texture2D(tDiffuse, vUv); }
+  `,
+};
+
 /** Cheap depth-of-field: blurs only the far field, keeping the near/mid crisp. */
 const DofShader = {
   uniforms: {
@@ -152,18 +164,19 @@ const DofShader = {
       coc = pow(coc, 1.4) * uStrength;
       vec3 col = texture2D(tDiffuse, vUv).rgb;
       if (coc > 0.006) {
-        vec2 px = (1.0 / uResolution) * coc * 5.0;
+        // 8-tap ring, unrolled. A const-array initialiser (vec2 K[8] = vec2[8](...)) is
+        // GLSL ES 3.00 syntax and will not compile in the 1.00 shaders ShaderPass emits.
+        vec2 px = (1.0 / uResolution) * coc * 9.0;
         vec3 acc = col;
-        float w = 1.0;
-        // 8-tap poisson-ish ring
-        const vec2 K[8] = vec2[8](
-          vec2( 0.94, 0.34), vec2(-0.94, 0.34), vec2( 0.34, 0.94), vec2(-0.34,-0.94),
-          vec2( 0.66,-0.75), vec2(-0.66, 0.75), vec2( 0.15,-0.99), vec2(-0.15, 0.99));
-        for (int i = 0; i < 8; i++) {
-          acc += texture2D(tDiffuse, vUv + K[i] * px).rgb;
-          w += 1.0;
-        }
-        col = acc / w;
+        acc += texture2D(tDiffuse, vUv + vec2( 0.94,  0.34) * px).rgb;
+        acc += texture2D(tDiffuse, vUv + vec2(-0.94,  0.34) * px).rgb;
+        acc += texture2D(tDiffuse, vUv + vec2( 0.34,  0.94) * px).rgb;
+        acc += texture2D(tDiffuse, vUv + vec2(-0.34, -0.94) * px).rgb;
+        acc += texture2D(tDiffuse, vUv + vec2( 0.66, -0.75) * px).rgb;
+        acc += texture2D(tDiffuse, vUv + vec2(-0.66,  0.75) * px).rgb;
+        acc += texture2D(tDiffuse, vUv + vec2( 0.15, -0.99) * px).rgb;
+        acc += texture2D(tDiffuse, vUv + vec2(-0.15,  0.99) * px).rgb;
+        col = acc / 9.0;
       }
       gl_FragColor = vec4(col, 1.0);
     }
@@ -185,24 +198,56 @@ export class PostFX {
     const { renderer, scene, camera, width, height } = this.engine;
     const q = settings.q;
     const dpr = renderer.getPixelRatio();
+    const w = Math.floor(width * dpr), h = Math.floor(height * dpr);
 
-    const rt = new THREE.WebGLRenderTarget(
-      Math.floor(width * dpr), Math.floor(height * dpr),
-      { type: THREE.HalfFloatType, samples: 0, depthTexture: new THREE.DepthTexture(Math.floor(width * dpr), Math.floor(height * dpr)) }
-    );
+    /**
+     * The scene is rendered into a DEDICATED target that owns the depth texture, and the
+     * post chain ping-pongs on plain buffers that never have it attached.
+     *
+     * This is not a stylistic choice. EffectComposer builds renderTarget2 via
+     * renderTarget1.clone(), and WebGLRenderTarget.copy() assigns `depthTexture` by
+     * REFERENCE — so both ping-pong buffers share one depth texture. A depth-reading pass
+     * then samples a texture that is simultaneously the depth attachment of the framebuffer
+     * it is drawing into. That is a feedback loop and its result is undefined; in practice
+     * it returned a constant and flattened the entire frame to the background colour.
+     */
+    this.sceneRT = new THREE.WebGLRenderTarget(w, h, {
+      type: THREE.HalfFloatType,
+      depthTexture: new THREE.DepthTexture(w, h),
+      depthBuffer: true, stencilBuffer: false,
+    });
+
+    const rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, depthBuffer: false, stencilBuffer: false });
     this.composer = new EffectComposer(renderer, rt);
     this.composer.setPixelRatio(dpr);
     this.composer.setSize(width, height);
 
-    this.renderPass = new RenderPass(scene, camera);
-    this.composer.addPass(this.renderPass);
+    // Entry pass: draw the scene into sceneRT, then bring it into the chain. When DOF is
+    // enabled the DOF pass IS the entry blit, so there is no extra full-screen copy.
+    const self = this;
+    // The second argument names the uniform ShaderPass auto-binds to the chain's read
+    // buffer. We pass a name this shader does not declare, so ShaderPass leaves our
+    // tDiffuse pinned to sceneRT instead of overwriting it with an empty read buffer.
+    this.scenePass = new ShaderPass(q.dof ? DofShader : CopyIntoChainShader, '__unbound');
+    this.scenePass.uniforms.tDiffuse.value = this.sceneRT.texture;
+    this.scenePass.needsSwap = true;
+    const innerRender = this.scenePass.render.bind(this.scenePass);
+    this.scenePass.render = function (rndr, writeBuffer, readBuffer, deltaTime, maskActive) {
+      const prev = rndr.getRenderTarget();
+      rndr.setRenderTarget(self.sceneRT);
+      rndr.clear(true, true, true);
+      rndr.render(scene, camera);
+      rndr.setRenderTarget(prev);
+      this.uniforms.tDiffuse.value = self.sceneRT.texture;
+      innerRender(rndr, writeBuffer, readBuffer, deltaTime, maskActive);
+    };
+    this.composer.addPass(this.scenePass);
 
     if (q.dof) {
-      this.dof = new ShaderPass(DofShader);
-      this.dof.uniforms.tDepth.value = rt.depthTexture;
+      this.dof = this.scenePass;
+      this.dof.uniforms.tDepth.value = this.sceneRT.depthTexture;
       this.dof.uniforms.uNear.value = camera.near;
       this.dof.uniforms.uFar.value = camera.far;
-      this.composer.addPass(this.dof);
     }
 
     if (q.bloom) {
@@ -225,24 +270,25 @@ export class PostFX {
     this.output = new OutputPass();
     this.composer.addPass(this.output);
 
-    this._rt = rt;
+    this._rt = rt;   // ping-pong buffer, no depth attachment
     this.resize();
   }
 
   rebuild() {
     this.composer?.dispose?.();
     this._rt?.dispose?.();
-    this.dof = this.bloom = this.grade = this.smaa = null;
+    this.sceneRT?.dispose?.();
+    this.dof = this.bloom = this.grade = this.smaa = this.scenePass = null;
     this._build();
   }
 
   resize() {
     const { width, height, renderer } = this.engine;
     const dpr = renderer.getPixelRatio();
+    const w = Math.floor(width * dpr), h = Math.floor(height * dpr);
     this.composer.setPixelRatio(dpr);
     this.composer.setSize(width, height);
-    const w = Math.floor(width * dpr), h = Math.floor(height * dpr);
-    if (this._rt?.depthTexture) { this._rt.depthTexture.image.width = w; this._rt.depthTexture.image.height = h; this._rt.depthTexture.needsUpdate = true; }
+    this.sceneRT?.setSize(w, h);
     this.grade?.uniforms.uResolution.value.set(w, h);
     if (this.dof) this.dof.uniforms.uResolution.value.set(w, h);
     this.bloom?.setSize(width, height);

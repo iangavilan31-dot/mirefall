@@ -82,6 +82,19 @@ export class Game {
     this.postfx = new PostFX(this.engine, this.sky);
     this.ui = new UI(this);
 
+    // Things that must not appear in the water's own reflection: the murk bed under the
+    // surface, screen-facing fog cards, particles, the sword trail and the flat lilypads.
+    this.water.excludeFromReflection = [
+      this.fog.group, this.fx.points, this.fx.trailMesh,
+      ...this.fx.rings.map((r) => r.mesh),
+      this.world.lilypads,
+    ].filter(Boolean);
+    this.world.group.traverse((o) => {
+      if (o.isMesh && o.material?.color && o.geometry?.parameters?.width === 320) {
+        this.water.excludeFromReflection.push(o);   // the swamp bed
+      }
+    });
+
     this._bindEvents();
     this._buildCaptureRig();
 
@@ -354,9 +367,7 @@ export class Game {
 
     // ---- render ----
     this.engine.renderer.info.reset();
-    this.water.mesh.visible = false;
     this.water.renderReflection(this.engine.scene, this.engine.camera);
-    this.water.mesh.visible = true;
     this.postfx.render();
 
     input.postUpdate();
@@ -378,25 +389,67 @@ export class Game {
   }
 
   // ------------------------------------------------------ capture support --
+  /**
+   * Named framings, resolved against LIVE player/boss positions every frame so a shot
+   * stays correct regardless of where the run left them. Hardcoded coordinates were the
+   * reason the first capture pass photographed empty water.
+   */
   _buildCaptureRig() {
+    const P = () => this.player.pos;
+    const B = () => this.boss.root.position;
+    const head = () => this.boss.model.headWorld(new THREE.Vector3());
+
     this.shots = {
-      hero:      { pos: [4.4, 2.05, 14.5], look: [1.5, 12.5, -12], fov: 48 },
+      // The reference frame: player low and left of centre, boss crowned by the moon,
+      // wings spanning the width. Camera sits behind and slightly right of the player.
+      hero: () => {
+        const p = P(), b = B();
+        const to = new THREE.Vector3(b.x - p.x, 0, b.z - p.z).normalize();
+        const right = new THREE.Vector3(-to.z, 0, to.x);
+        const pos = new THREE.Vector3(p.x, 0, p.z).addScaledVector(to, -6.2).addScaledVector(right, 1.9).setY(2.15);
+        const look = new THREE.Vector3(p.x, 0, p.z).addScaledVector(to, 13).addScaledVector(right, 0.9).setY(8.2);
+        return { pos, look, fov: 52 };
+      },
       gameplay_default: null,   // uses the live rig
-      boss_close:{ pos: [2.0, 6.0, -1.0], look: [0, 24, -14], fov: 55 },
-      player_close: { pos: [1.6, 1.05, 3.2], look: [0, 0.85, 0], fov: 44 },
-      wide_arena:{ pos: [-26, 5.5, 34], look: [0, 10, -10], fov: 60 },
-      lotus:     { pos: [13.6, 0.9, 30.4], look: [13, 0.15, 27], fov: 40 },
-      left_frame:{ pos: [-14, 2.6, 18], look: [-24, 6, -4], fov: 55 },
+      boss_close: () => {
+        const b = B(), h = head();
+        const pos = new THREE.Vector3(b.x + 6, Math.max(3.5, h.y * 0.30), b.z + 26);
+        return { pos, look: h.clone().setY(h.y * 0.92), fov: 55 };
+      },
+      player_close: () => {
+        const p = P();
+        return {
+          pos: new THREE.Vector3(p.x + 1.35, p.y + 1.35, p.z + 1.9),
+          look: new THREE.Vector3(p.x, p.y + 0.72, p.z), fov: 42,
+        };
+      },
+      wide_arena: () => {
+        const p = P(), b = B();
+        const mid = new THREE.Vector3().addVectors(p, b).multiplyScalar(0.5);
+        return { pos: new THREE.Vector3(mid.x - 30, 6.5, mid.z + 30), look: new THREE.Vector3(mid.x, 11, mid.z), fov: 62 };
+      },
+      lotus: () => ({ pos: new THREE.Vector3(14.9, 0.85, 29.6), look: new THREE.Vector3(13, 0.12, 27), fov: 38 }),
+      left_frame: () => {
+        const p = P();
+        return { pos: new THREE.Vector3(p.x - 9, 2.6, p.z - 6), look: new THREE.Vector3(-26, 6.5, -4), fov: 56 };
+      },
+      stagger_close: () => {
+        const h = head(), p = P();
+        return { pos: new THREE.Vector3(p.x + 2.5, 3.4, p.z + 7), look: h, fov: 50 };
+      },
     };
   }
 
   applyShot(name) {
     const s = this.shots[name];
     if (!s) return false;
+    const cfg = typeof s === 'function' ? s() : s;
+    if (!cfg) return false;
     const cam = this.engine.camera;
-    cam.position.set(...s.pos);
-    cam.lookAt(new THREE.Vector3(...s.look));
-    cam.fov = s.fov;
+    cam.position.copy(cfg.pos);
+    cam.up.set(0, 1, 0);
+    cam.lookAt(cfg.look);
+    cam.fov = cfg.fov;
     cam.updateProjectionMatrix();
     this._shotLock = name;
     return true;

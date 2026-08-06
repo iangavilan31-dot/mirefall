@@ -20,12 +20,16 @@ const SHOTS = [
     id: 'hero', desc: 'The reference frame recreated: player low-left, boss crowned by moon, wings full width.',
     setup: async (api) => {
       await api.call('start', false);
-      await api.call('teleport', 0, 26);
-      await api.call('setBossHealth', 1.0);
-      await api.call('setTimeScale', 0);
+      // The boss enters from 26 m above its hover height; freezing time before the
+      // entrance finishes would photograph it off the top of the frame.
+      await api.settle(5.0);
+      await api.call('teleport', 0, 18);
+      await api.eval('M.game.boss.nextAttackIn = 999;');
+      await api.settle(1.2);
       await api.call('hideUi', true);
       await api.call('shot', 'hero');
     },
+    settle: 1.2,
   },
   {
     id: 'gameplay_default', desc: 'Same qualities from the normal over-shoulder combat camera.',
@@ -40,7 +44,7 @@ const SHOTS = [
   },
   {
     id: 'boss_close', desc: 'Wing translucency, moss detail, eye bloom at close range.',
-    setup: async (api) => { await api.call('hideUi', true); await api.call('setTimeScale', 0); await api.call('shot', 'boss_close'); },
+    setup: async (api) => { await api.call('hideUi', true); await api.call('shot', 'boss_close'); },
   },
   {
     id: 'player_close', desc: 'Hat silhouette, straw fringe, blade highlight, waterline ripples.',

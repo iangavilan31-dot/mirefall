@@ -88,7 +88,7 @@ export class FogSystem {
     this.sky = sky;
     this.group = new THREE.Group();
     this.group.name = 'fog';
-    this.group.layers.set(2);   // fog cards are not reflected (too costly, reads wrong)
+    // fog cards are excluded from the reflection pass by Water.excludeFromReflection
     scene.add(this.group);
 
     this.uniforms = {
@@ -116,12 +116,18 @@ export class FogSystem {
     if (sheets <= 0) return;
 
     // Layer plan: dense low mist near the waterline, thinner sheets higher up.
+    //
+    // These cards are an ACCENT on top of the scene's exponential fog — they add drift and
+    // shape, they are not the fog itself. Counts and opacities are deliberately small:
+    // alpha compositing is multiplicative, so N overlapping cards of opacity a reach
+    // 1-(1-a)^N very fast. An earlier pass used ~200 cards at 0.10–0.34 and buried the
+    // entire scene in a flat grey wash.
     const plan = [
-      { y: 0.55, count: 70, scale: [14, 30], opacity: 0.34, tex: 12 },
-      { y: 1.7, count: 48, scale: [18, 40], opacity: 0.24, tex: 27 },
-      { y: 4.5, count: 34, scale: [26, 52], opacity: 0.17, tex: 41 },
-      { y: 9.0, count: 26, scale: [34, 66], opacity: 0.13, tex: 55 },
-      { y: 16.0, count: 20, scale: [44, 84], opacity: 0.10, tex: 68 },
+      { y: 0.60, count: 16, scale: [16, 34], opacity: 0.100, tex: 12 },
+      { y: 2.00, count: 12, scale: [22, 44], opacity: 0.075, tex: 27 },
+      { y: 5.00, count: 10, scale: [30, 58], opacity: 0.055, tex: 41 },
+      { y: 10.0, count: 8, scale: [38, 72], opacity: 0.040, tex: 55 },
+      { y: 17.0, count: 6, scale: [46, 88], opacity: 0.030, tex: 68 },
     ].slice(0, sheets);
 
     for (let li = 0; li < plan.length; li++) {
@@ -139,7 +145,8 @@ export class FogSystem {
       const scales = new Float32Array(count);
       for (let i = 0; i < count; i++) {
         const a = Math.random() * Math.PI * 2;
-        const r = 8 + Math.pow(Math.random(), 0.6) * 96;
+        // keep cards out of the player's immediate bubble so the camera never sits inside one
+        const r = 18 + Math.pow(Math.random(), 0.6) * 84;
         offs[i * 3] = Math.sin(a) * r;
         offs[i * 3 + 1] = p.y + (Math.random() - 0.5) * p.y * 0.8;
         offs[i * 3 + 2] = Math.cos(a) * r;
@@ -168,7 +175,7 @@ export class FogSystem {
       const mesh = new THREE.Mesh(geo, mat);
       mesh.frustumCulled = false;
       mesh.renderOrder = 10 + li;
-      mesh.layers.set(2);
+      
       this.group.add(mesh);
       this.layers.push({ mesh, mat, y: p.y });
     }

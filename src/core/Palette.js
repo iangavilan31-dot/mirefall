@@ -6,7 +6,9 @@ import * as THREE from 'three';
  * Anything above ~0.18 saturation must be one of the four sanctioned accents.
  */
 
-const c = (hex) => new THREE.Color(hex).convertSRGBToLinear();
+// three's ColorManagement already converts sRGB hex -> linear working space on set.
+// Converting again here would darken every colour in the game.
+const c = (hex) => new THREE.Color(hex);
 
 export const PALETTE = {
   fog:        c(0x8b979c),

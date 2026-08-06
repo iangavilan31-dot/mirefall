@@ -79,7 +79,7 @@ export class World {
       color: PALETTE.waterDeep.clone(), roughness: 1.0,
     }));
     bed.receiveShadow = true;
-    bed.layers.set(2);   // never reflected
+    // bed is excluded from the reflection pass by Water.excludeFromReflection
     this.group.add(bed);
   }
 
@@ -503,7 +503,7 @@ export class World {
 
     const inst = new THREE.InstancedMesh(geo, mat, total);
     inst.receiveShadow = true;
-    inst.layers.set(2);
+    
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), scl = new THREE.Vector3();
     let i = 0;
     this.lilypadData = [];

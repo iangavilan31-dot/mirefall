@@ -175,10 +175,11 @@ export class Boss {
     const geo = new THREE.RingGeometry(0.72, 1.0, 48);
     geo.rotateX(-Math.PI / 2);
     for (let i = 0; i < 14; i++) {
+      // Normal blending, tone mapping ON: an additive untonemapped decal reads as a pure
+      // white blowout once bloom is in the chain, which destroys the whole frame.
       const mat = new THREE.MeshBasicMaterial({
         color: PALETTE.dangerTell.clone(), transparent: true, opacity: 0,
-        depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
-        blending: THREE.AdditiveBlending,
+        depthWrite: false, side: THREE.DoubleSide, toneMapped: true,
       });
       const m = new THREE.Mesh(geo, mat);
       m.visible = false;
