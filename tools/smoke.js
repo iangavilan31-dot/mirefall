@@ -81,7 +81,7 @@ function check(name, cond, detail = '') {
       const n0 = await api.eval('return M.game.boss.__endCount;');
       await api.eval(`M.game.boss.nextAttackIn = 999;`);   // stop it queueing follow-ups
       await api.call('forceAttack', a);
-      await api.settle(a === 'moonfall' ? 5.2 : a === 'legTriple' ? 4.2 : 3.0);
+      try { await api.waitFor(`M.game.boss.__endCount > ${n0}`, { timeout: 45000, label: `attack ${a} ends` }); } catch {}
       const n1 = await api.eval('return M.game.boss.__endCount;');
       const bs = await api.call('boss');
       check(`boss attack "${a}" completes`, n1 > n0, `endCount ${n0}->${n1}, state=${bs.state}/${bs.attack}`);
