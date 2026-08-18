@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>MIREFALL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<style>
+  :root {
+    --fog:#8b979c; --deep:#12171a; --ink:#0a0d0f;
+    --bone:#e9eef0; --moss:#4a5340; --lantern:#ffb85c; --lotus:#ff7cc0;
+    --ui-fade: 0.55;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#0a0d0f; }
+  body { font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif; color:#e9eef0; -webkit-font-smoothing:antialiased; }
+  #app { position:fixed; inset:0; }
+  canvas#gl { display:block; width:100%; height:100%; touch-action:none; }
+  #ui-root { position:fixed; inset:0; pointer-events:none; z-index:10; }
+  #ui-root .pane { pointer-events:auto; }
+  .hidden { display:none !important; }
+  #boot {
+    position:fixed; inset:0; z-index:100; background:#0a0d0f;
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:22px;
+    transition: opacity 1.1s ease;
+  }
+  #boot.gone { opacity:0; pointer-events:none; }
+  #boot .title { font-size:13px; letter-spacing:0.62em; text-transform:uppercase; color:#8b979c; font-weight:400; text-indent:0.62em; }
+  #boot .bar { width:180px; height:1px; background:rgba(233,238,240,0.14); position:relative; overflow:hidden; }
+  #boot .bar i { position:absolute; inset:0 100% 0 0; background:rgba(233,238,240,0.62); transition:right 0.35s ease; }
+  #boot .note { font-size:10px; letter-spacing:0.3em; color:rgba(139,151,156,0.5); text-transform:uppercase; }
+  #fatal { position:fixed; inset:0; z-index:200; background:#0a0d0f; color:#c0705f;
+    font-family:ui-monospace,Consolas,monospace; font-size:12px; padding:40px; overflow:auto; white-space:pre-wrap; }
+</style>
+  <script type="module" crossorigin src="./assets/index-zKEORllY.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/three-RKGChoA1.js">
+</head>
+<body>
+  <div id="app">
+    <canvas id="gl"></canvas>
+    <div id="ui-root"></div>
+  </div>
+  <div id="boot">
+    <div class="title">Mirefall</div>
+    <div class="bar"><i id="boot-bar"></i></div>
+    <div class="note" id="boot-note">waking the mire</div>
+  </div>
+  <div id="fatal" class="hidden"></div>
+  <script>
+    window.addEventListener('error', (e) => {
+      const f = document.getElementById('fatal');
+      if (!f) return;
+      f.classList.remove('hidden');
+      f.textContent = 'FATAL\n\n' + (e.error && e.error.stack ? e.error.stack : e.message);
+      window.__MIREFALL_FATAL__ = e.error ? (e.error.stack || e.error.message) : e.message;
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      window.__MIREFALL_FATAL__ = String(e.reason && e.reason.stack || e.reason);
+    });
+  </script>
+</body>
+</html>
