@@ -60,7 +60,9 @@ function ridged(perm, x, y, octaves, period) {
 
 // ------------------------------------------------------------- plumbing ----
 function canvas(size) {
-  const c = document.createElement('canvas');
+  const c = typeof document === 'undefined'
+    ? new OffscreenCanvas(size, size)
+    : document.createElement('canvas');
   c.width = c.height = size;
   return c;
 }
@@ -529,6 +531,39 @@ export function disposeAll() {
     else if (v) for (const t of Object.values(v)) t?.dispose?.();
   }
   cache.clear();
+}
+
+// The same seeded recipes run in a worker; only their finished pixels cross threads.
+// Canvas copies preserve the original orientation/color behavior of CanvasTexture.
+export function transferTextureCache() {
+  const transfers = [];
+  const pack = (texture) => {
+    const image = texture.image.transferToImageBitmap();
+    transfers.push(image);
+    return { image, colorSpace: texture.colorSpace, repeat: texture.repeat.toArray(),
+      wrapS: texture.wrapS, wrapT: texture.wrapT, anisotropy: texture.anisotropy };
+  };
+  const entries = [...cache].map(([key, value]) => [key, value.isTexture
+    ? { single: pack(value) }
+    : { maps: Object.fromEntries(Object.entries(value).map(([name, texture]) => [name, pack(texture)])) }]);
+  return { entries, transfers };
+}
+
+export function restoreTextureCache(entries) {
+  const unpack = (data) => {
+    const c = canvas(data.image.width);
+    c.getContext('2d').drawImage(data.image, 0, 0);
+    data.image.close();
+    const texture = new THREE.CanvasTexture(c);
+    texture.colorSpace = data.colorSpace;
+    texture.repeat.fromArray(data.repeat);
+    texture.wrapS = data.wrapS; texture.wrapT = data.wrapT;
+    texture.anisotropy = Math.min(data.anisotropy, anisoRef.value);
+    return texture;
+  };
+  for (const [key, value] of entries) cache.set(key, value.single
+    ? unpack(value.single)
+    : Object.fromEntries(Object.entries(value.maps).map(([name, data]) => [name, unpack(data)])));
 }
 
 export default {

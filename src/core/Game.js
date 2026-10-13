@@ -11,6 +11,7 @@ import { FogSystem } from '../render/FogSystem.js';
 import { Water } from '../world/Water.js';
 import { World } from '../world/World.js';
 import TL from '../world/TextureLab.js';
+import { prepareTextures } from '../world/prepareTextures.js';
 import { Player } from '../player/Player.js';
 import { Boss } from '../boss/Boss.js';
 import { Enemy } from '../enemies/Enemy.js';
@@ -45,6 +46,9 @@ export class Game {
     this.engine = new Engine(this.canvas);
     TL.setAnisotropy(Math.min(settings.q.anisotropy, this.engine.caps.maxAniso));
     input.attach(this.canvas);
+
+    this.texturePreparation = await prepareTextures(fraction =>
+      this.onProgress(0.06 + fraction * 0.07, `Preparing materials · ${Math.round(fraction * 100)}%`));
 
     await step(0.14, 'raising the moon');
     this.sky = new Sky().addTo(this.engine.scene);
@@ -98,7 +102,26 @@ export class Game {
     this._bindEvents();
     this._buildCaptureRig();
 
-    await step(1.0, 'the mire is listening');
+    await step(0.96, 'Preparing the scene');
+    // The lantern pool changes shader light counts. Create it before compiling,
+    // otherwise the first frame discards the prepared variants and stalls again.
+    this.lighting.update(0, 0, this.player.pos);
+    this.sky.update(0, 0, this.engine.camera.position);
+    const renderer = this.engine.renderer;
+    const target = renderer.getRenderTarget();
+    renderer.setRenderTarget(this.postfx.sceneRT);
+    await renderer.compileAsync(this.engine.scene, this.engine.camera);
+    if (this.water.reflectRT) {
+      // Water draws a second scene pass without shadows: prepare that variant too.
+      const shadows = renderer.shadowMap.enabled;
+      renderer.shadowMap.enabled = false;
+      renderer.setRenderTarget(this.water.reflectRT);
+      try { await renderer.compileAsync(this.engine.scene, this.engine.camera); }
+      finally { renderer.shadowMap.enabled = shadows; }
+    }
+    renderer.setRenderTarget(target);
+    await this.postfx.prepareShaders();
+    await step(1.0, 'Ready');
     this.setState('title');
     return this;
   }

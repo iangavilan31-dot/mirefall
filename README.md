@@ -4,8 +4,9 @@ A cinematic dark-fantasy third-person action game that runs in a desktop browser
 You are a small amphibian warrior, thigh-deep in a flooded swamp kingdom, fighting a
 colossal moth deity beneath a hazy moon.
 
-Built with Three.js. **No image, audio, or model assets** — every texture, mesh, sound and
-piece of music in the game is generated procedurally at load time.
+Built with Three.js. The textures, meshes, sound and music are generated procedurally.
+The interface uses locally hosted Inter and Fraunces under the SIL Open Font License;
+their licenses are included in `public/fonts/`.
 
 ---
 
@@ -25,8 +26,11 @@ npm run build
 npm run preview
 ```
 
-`dist/` is fully static — any web server will do. First load spends ~1–2 s synthesising
-textures; the loading bar reports progress.
+`dist/` is fully static, including the texture worker. First load prepares the same seeded
+texture pixels off the main thread and compiles scene, water-reflection and postprocessing
+shaders before play. The progress indicator reflects material preparation; total loading
+time depends on hardware. Browsers without worker/OffscreenCanvas support use the same
+recipes with a compatibility fallback.
 
 ### Requirements
 A desktop browser with WebGL2 (Chrome, Edge, Firefox, Safari 15+). A discrete or modern

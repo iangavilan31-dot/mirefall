@@ -8,7 +8,9 @@ import { input } from '../core/Input.js';
  */
 
 const CSS = `
-#ui-root { font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif; --s: 1; }
+@font-face { font-family: 'Mire Inter'; src: url('${import.meta.env.BASE_URL}fonts/inter-latin-400.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+@font-face { font-family: 'Mire Fraunces'; src: url('${import.meta.env.BASE_URL}fonts/fraunces-latin-600.woff2') format('woff2'); font-weight:600; font-style:normal; font-display:swap; }
+#ui-root { font-family:'Mire Inter',Arial,sans-serif; --s: 1; }
 #ui-root * { box-sizing: border-box; }
 .mf-hud { position:absolute; inset:0; pointer-events:none; opacity:1; transition:opacity .5s ease; }
 .mf-hud.dim { opacity:0; }
@@ -111,6 +113,36 @@ const CSS = `
   font-size:10px; line-height:1.5; color:rgba(180,220,190,.72); background:rgba(8,11,13,.55);
   padding:6px 9px; white-space:pre; pointer-events:none; }
 .mf-perf.hidden { display:none; }
+
+/* Clear field notes and quiet serif titles; no microtype for player instructions. */
+.mf-title { font-family:'Mire Fraunces',Georgia,serif; font-size:80px; font-weight:600; letter-spacing:.03em; text-indent:0; }
+.mf-sub-title { font-size:14px; line-height:1.6; letter-spacing:.06em; text-indent:0; text-transform:none; color:rgba(233,238,240,.78); }
+.mf-item { min-height:44px; font-size:14px; letter-spacing:.04em; text-transform:none; color:rgba(233,238,240,.82); }
+.mf-item:hover,.mf-item.sel { letter-spacing:.04em; }
+.mf-item:focus-visible,.mf-tab:focus-visible { outline:2px solid #dfe6d8; outline-offset:3px; }
+.mf-hint { max-width:88%; font-size:12px; line-height:1.7; letter-spacing:.03em; text-transform:none; text-align:center; color:rgba(233,238,240,.72); }
+.mf-boss .name { font-size:calc(13px * var(--s)); letter-spacing:.08em; text-indent:0; color:rgba(233,238,240,.8); }
+.mf-prompt { font-size:calc(14px * var(--s)); opacity:.75; }
+.mf-key { font-size:calc(12px * var(--s)); }
+.mf-toast,.mf-toast.show { font-size:calc(16px * var(--s)); letter-spacing:.08em; text-indent:0; }
+.mf-sub { font-size:calc(15px * var(--s)); line-height:1.5; color:rgba(233,238,240,.9); }
+.mf-tab { min-height:44px; font-size:13px; letter-spacing:.04em; color:rgba(233,238,240,.7); }
+.mf-row label { font-size:14px; letter-spacing:.02em; text-transform:none; color:rgba(233,238,240,.84); }
+.mf-row .val { font-size:12px; letter-spacing:.02em; color:rgba(233,238,240,.75); }
+.mf-row select,.mf-row button.opt { font-size:13px; letter-spacing:.02em; text-transform:none; min-height:36px; }
+.mf-note { font-size:12px; line-height:1.6; letter-spacing:.02em; color:rgba(233,238,240,.7); }
+@media (max-width:650px) {
+  .mf-title { font-size:48px; }
+  .mf-menu { min-width:0; width:85%; margin-top:32px; }
+  .mf-sub-title { max-width:85%; text-align:center; }
+  .mf-tabs { width:94%; flex-wrap:wrap; margin-top:18px; }
+  .mf-tab { padding:8px 12px; }
+  .mf-settings { width:90%; max-height:65vh; margin-top:16px; }
+  .mf-row { display:grid; gap:8px; }
+  .mf-row>div { min-width:0; justify-content:space-between; }
+  .mf-row input[type=range] { width:160px; max-width:65%; }
+  .mf-hint { bottom:18px; font-size:11px; }
+}
 `;
 
 export class UI {

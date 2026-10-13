@@ -333,6 +333,31 @@ export class PostFX {
     }
   }
 
+  async prepareShaders() {
+    const renderer = this.engine.renderer;
+    const target = renderer.getRenderTarget();
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const geometry = new THREE.PlaneGeometry(2, 2);
+    const scene = new THREE.Scene();
+    try {
+      for (const pass of this.composer.passes) {
+        const materials = new Set();
+        for (const value of Object.values(pass)) {
+          if (value?.isMaterial) materials.add(value);
+          if (Array.isArray(value)) value.forEach(material => { if (material?.isMaterial) materials.add(material); });
+        }
+        if (pass.fsQuad?.material) materials.add(pass.fsQuad.material);
+        scene.clear();
+        for (const material of materials) scene.add(new THREE.Mesh(geometry, material));
+        renderer.setRenderTarget(pass === this.output ? null : this.composer.writeBuffer);
+        await renderer.compileAsync(scene, camera);
+      }
+    } finally {
+      renderer.setRenderTarget(target);
+      geometry.dispose();
+    }
+  }
+
   render() { this.composer.render(); }
 }
 
